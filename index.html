@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MyUIS">
+<meta name="theme-color" content="#1A1A1A">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<title>MyUIS</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="dark">
+<header id="top">
+  <img src="logo.svg" class="logo" alt="UIS">
+  <div class="brand">UIS <span>MyUIS</span></div>
+  <div class="spacer"></div>
+  <button id="b-refresh" title="Оновити">⟳</button>
+  <button id="b-api" title="Посилання на дані">⚙</button>
+  <button id="b-theme" title="Тема">☀</button>
+</header>
+<div id="upd" class="sub"></div>
+
+<main>
+  <section id="page-tickets" class="page">
+    <div class="toolbar">
+      <input id="q" type="search" placeholder="🔍 Номер, область, виконавець, коментар">
+      <div class="chips" id="st-chips"></div>
+      <div class="chips" id="pr-chips"></div>
+      <div class="chips" id="ex-chips"></div>
+      <div id="count" class="sub"></div>
+    </div>
+    <div id="list" class="grid"></div>
+  </section>
+  <section id="page-stats" class="page" hidden>
+    <div id="stats" class="grid stats"></div>
+  </section>
+</main>
+
+<nav id="tabs">
+  <button data-tab="tickets" class="on">📋<span>Заявки</span></button>
+  <button data-tab="stats">📊<span>Статистика</span></button>
+  <button id="b-site">🌐<span>Сайт</span></button>
+</nav>
+
+<div id="modal" hidden><div class="box" id="modal-box"></div></div>
+<script src="app.js"></script>
+</body>
+</html>
