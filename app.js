@@ -26,7 +26,7 @@
   // ---------------------------------------------------------------- вкладки
   function showTab(name) {
     document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
-    ['tickets', 'stats'].forEach((t) => { $('#page-' + t).hidden = t !== name; });
+    ['tickets', 'stats', 'sla'].forEach((t) => { $('#page-' + t).hidden = t !== name; });
     ls.set('tab', name);
   }
   document.querySelectorAll('#tabs button').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
@@ -164,6 +164,7 @@
         '<div class="body"><div class="n">№ ' + esc(t.n) + ' · ' + esc(t.o) + '</div>' +
         '<div class="st" style="color:' + color(t.s) + '">' + esc(t.s) + (t.od ? ' ⏰' : '') + '</div>' +
         '<div>👤 ' + (t.e ? esc(t.e) : '— без виконавця —') + '</div>' +
+        (t.ix ? '<div>🏤 Відділення ' + esc(t.ix) + '</div>' : '') +
         (t.c ? '<div class="c">' + esc(t.c) + '</div>' : '') +
         '<div class="c">змінено: ' + esc(t.l) + (ts > 0 ? ' (' + ago(ts) + ')' : '') + '</div></div>' +
         '<div class="star" data-star="' + esc(norm(t.n)) + '">' + (on ? '★' : '☆') + '</div></div>';
@@ -177,7 +178,7 @@
     const t = (data.tickets || []).find((x) => x.n === n);
     if (!t) return;
     const kv = (k, v) => '<div class="kv"><span class="sub">' + k + '</span><b>' + esc(v || '—') + '</b></div>';
-    modal('<h2>Заявка № ' + esc(t.n) + '</h2>' + kv('Статус', t.s) + kv('Область', t.o) + kv('Виконавець', t.e) +
+    modal('<h2>Заявка № ' + esc(t.n) + '</h2>' + kv('Статус', t.s) + kv('Область', t.o) + kv('Відділення', t.ix) + kv('Виконавець', t.e) +
       kv('Проєкт', t.p === 'main' ? 'Основний (УП)' : 'Пілотний') + kv('Створено', t.cr) + kv('Остання зміна', t.l) +
       (t.c ? '<p style="overflow-wrap:anywhere">' + esc(t.c) + '</p>' : '') +
       '<div class="row"><button id="m-copy">Копіювати №</button><button id="m-close">Закрити</button>' +
@@ -236,15 +237,28 @@
   }
 
   function renderAll() {
-    renderTickets(); renderStats();
+    renderTickets(); renderStats(); if (window.UisSLA) UisSLA.render(data);
     if (data && data.updated_at) $('#upd').textContent = 'дані: ' + data.updated_at;
     else if (!apiUrl) $('#upd').textContent = '';
   }
 
   // ---------------------------------------------------------------- старт
+  if (window.UisSLA) {
+    UisSLA.init({
+      root: $('#page-sla'),
+      call: async (payload) => {
+        if (!apiUrl) return { error: 'no api url' };
+        try {
+          const r = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) });
+          return await r.json();
+        } catch (e) { return { error: 'network' }; }
+      },
+      onSaved: () => { try { ls.set('cache', JSON.stringify(data)); } catch (e) {} }
+    });
+  }
   try { stars = new Set(JSON.parse(ls.get('stars', '[]'))); } catch (e) { stars = new Set(); }
   applyDark();
-  showTab(ls.get('tab', 'tickets') === 'stats' ? 'stats' : 'tickets');
+  showTab(['stats', 'sla'].indexOf(ls.get('tab', 'tickets')) >= 0 ? ls.get('tab', 'tickets') : 'tickets');
   renderAll();
   if (!ls.get('asked_url', '') && !apiUrl) { ls.set('asked_url', '1'); askApi(); }
   refresh();
