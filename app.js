@@ -229,8 +229,8 @@
       const w = data.week || {};
       h += '<div class="card"><h3>За тиждень (з ' + esc(w.start) + ')</h3>' + kv('Закрито', w.closed, '#2E7D32') + kv('Скасовано', w.cancelled, '#C62828') + kv('Зареєстровано', w.registered, '#1565C0') + '</div>';
       if ((data.eff || []).length) {
-        h += '<div class="card"><h3>Ефективність виконавців</h3><div class="sub">середній час закриття · заявок за тиждень</div>' +
-          data.eff.map((e) => kv(e.name, e.avg + '  ·  ' + e.week)).join('') + '</div>';
+        h += '<div class="card"><h3>Ефективність виконавців</h3><div class="sub">середній час закриття · заявок за тиждень · SLA за 30 днів</div>' +
+          data.eff.map((e) => kv(e.name, e.avg + '  ·  ' + e.week) + ((e.sla_ok != null || e.sla_bad != null) ? '<div class="sub" style="text-align:right;margin:-4px 0 6px">SLA: <span style="color:#2E7D32">✓ ' + (e.sla_ok || 0) + '</span> · <span style="color:#C62828">✗ ' + (e.sla_bad || 0) + '</span> · <b>' + (e.sla_pct != null ? e.sla_pct + '%' : '—') + '</b> (30 дн.)</div>' : '')).join('') + '</div>';
       }
     } catch (e) { h = '<div class="empty">Помилка відображення: ' + esc(e.message) + '</div>'; }
     box.innerHTML = h;

@@ -6,9 +6,10 @@
  * Час рахується у робочих годинах: пн-пт, 10:00-19:00 (як у моніторі). */
 (function () {
   'use strict';
-  var WS = 10, WE = 19, ARR = 'Прибув на локацію', DONE_DAYS = 30;
+  var WS = 10, WE = 18, ARR = 'Прибув на локацію', DONE_DAYS = 30;
   var OK = '#43A047', WARN = '#FB8C00', BAD = '#E53935';
   var root = null, opts = {}, data = null, view = 'open', gsel = '', pw = '';
+  var aFrom = null, aTo = '', verd = 'all', exsel = '', lim = 100;
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function cn(s) { return String(s || '').toLowerCase().replace(/[^a-zа-яіїєґ0-9]+/g, ' ').trim(); }
@@ -53,11 +54,11 @@
     var m = gmap(), now = new Date();
     var arrMap = {};
     ((data && data.arr) || []).forEach(function (a) { arrMap[nn(a.n)] = a; });
-    var open = [], done = [], nog = 0;
+    var open = [], done = [], arch = [], nog = 0;
     ((data && data.tickets) || []).forEach(function (t) {
       var n = nn(t.n);
       if (t.s === ARR || arrMap[n]) {
-        if (!arrMap[n]) arrMap[n] = { n: t.n, ci: t.ci, cr: t.cr, ar: t.l };
+        if (!arrMap[n]) arrMap[n] = { n: t.n, ci: t.ci, cr: t.cr, ar: t.l, e: t.e };
         return;
       }
       var g = m[cn(t.ci)];
@@ -68,13 +69,16 @@
     var limit = new Date(now.getTime() - DONE_DAYS * 864e5);
     Object.keys(arrMap).forEach(function (k) {
       var a = arrMap[k], g = m[cn(a.ci)], ar = parseTs(a.ar);
-      if (!g || !ar || ar < limit) return;
+      if (!ar) return;
       var el = bh(parseTs(a.cr), ar);
-      done.push({ a: a, g: g, el: el, ar: ar, ok: el <= g.hours, over: el - g.hours });
+      var rec = { a: a, g: g, el: el, ar: ar, e: a.e || '', ok: g ? el <= g.hours : null, over: g ? el - g.hours : 0 };
+      arch.push(rec);
+      if (g && ar >= limit) done.push(rec);
     });
     open.sort(function (x, y) { return x.rem - y.rem; });
     done.sort(function (x, y) { return y.ar - x.ar; });
-    return { open: open, done: done, nog: nog };
+    arch.sort(function (x, y) { return y.ar - x.ar; });
+    return { open: open, done: done, arch: arch, nog: nog };
   }
   function level(o) {
     if (o.rem < 0) return 2;
@@ -111,7 +115,10 @@
       '.sla-row button{font:inherit;color:var(--tx);background:var(--in);border:1px solid var(--bd);border-radius:10px;padding:8px 14px;cursor:pointer}' +
       '.sla-row .pri{background:var(--red);border-color:var(--red);color:#fff}' +
       '.sla-row .del{color:#E53935;margin-right:auto}' +
-      '.sla-err{color:#E53935;font-size:13px;min-height:18px;margin-top:8px}';
+      '.sla-err{color:#E53935;font-size:13px;min-height:18px;margin-top:8px}' +
+      '.sla-dates{display:flex;gap:12px;flex-wrap:wrap;margin:6px 0}.sla-dates label{font-size:12px;color:var(--sub);display:flex;align-items:center;gap:6px}' +
+      '.sla-dates input{padding:6px 8px;border-radius:8px;border:1px solid var(--bd);background:var(--in);color:var(--tx);font-size:14px}body.dark .sla-dates input{color-scheme:dark}' +
+      '.sla-h{margin:14px 0 4px;font-size:15px}.sla-click{cursor:pointer}.sla-click.on{box-shadow:0 0 0 2px var(--red)}';
     document.head.appendChild(s);
   }
   function ov() {
@@ -149,11 +156,13 @@
     h += '<div class="sla-seg">' +
       '<span class="sla-b' + (view === 'open' ? ' on' : '') + '" data-v="open">⏱ Відкриті (' + c.open.length + ')</span>' +
       '<span class="sla-b' + (view === 'done' ? ' on' : '') + '" data-v="done">✓ Прибули (' + c.done.length + ')</span>' +
+      '<span class="sla-b' + (view === 'archive' ? ' on' : '') + '" data-v="archive">🗄 Архів</span>' +
       '<span class="sla-b' + (view === 'groups' ? ' on' : '') + '" data-v="groups">⚙ Групи (' + groups().length + ')</span></div>';
     if (!groups().length && view !== 'groups') {
       h += '<div class="empty">Груп SLA ще немає.<br><br><span class="sla-b on" data-v="groups">⚙ Створити першу групу</span></div>';
     } else if (view === 'open') h += viewOpen(c);
     else if (view === 'done') h += viewDone(c);
+    else if (view === 'archive') h += viewArchive(c);
     else h += viewGroups(c);
     root.innerHTML = h;
   }
@@ -208,6 +217,86 @@
         '<div class="c">' + esc(o.g.name) + ' · створено ' + esc(o.a.cr) + ' · прибув ' + esc(o.a.ar) + '</div></div></div>';
     }).join('') || '<div class="empty">За ' + DONE_DAYS + ' днів прибуттів у цій групі ще немає</div>') + '</div>';
     h += '<div class="sla-note">Час прибуття фіксує монітор (раз на 10 хв, 10:30–19:00), тому точність — до ~10 хвилин.</div>';
+    return h;
+  }
+
+  // ------------------------------------------------------------ архів
+  function ymd(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  function pdate(s, end) {
+    if (!s) return null;
+    var p = s.split('-');
+    return end ? new Date(+p[0], +p[1] - 1, +p[2], 23, 59, 59) : new Date(+p[0], +p[1] - 1, +p[2], 0, 0, 0);
+  }
+  function pcol(p) { return p >= 90 ? OK : p >= 70 ? WARN : BAD; }
+  function stat(list) {
+    var ok = list.filter(function (r) { return r.ok; }).length;
+    return { n: list.length, ok: ok, bad: list.length - ok, pct: list.length ? Math.round(ok * 100 / list.length) : null };
+  }
+  function statHtml(st, title, attr, on, sub) {
+    return '<div class="card sla-click' + (on ? ' on' : '') + '" ' + attr + '><h3>' + esc(title) + '</h3>' +
+      (sub ? '<div class="sla-kv"><span>' + sub + '</span></div>' : '') +
+      '<div class="sla-kv"><span>Всього</span><b>' + st.n + '</b></div>' +
+      '<div class="sla-kv"><span style="color:' + OK + '">✓ Вчасно</span><b>' + st.ok + '</b></div>' +
+      '<div class="sla-kv"><span style="color:' + BAD + '">✗ Порушено</span><b>' + st.bad + '</b></div>' +
+      '<div class="sla-kv"><span>Виконання SLA</span><b>' + (st.pct === null ? '—' : st.pct + '%') + '</b></div>' +
+      (st.pct === null ? '' : '<div class="sla-bar"><i style="width:' + st.pct + '%;background:' + pcol(st.pct) + '"></i></div>') + '</div>';
+  }
+  function viewArchive(c) {
+    if (aFrom === null) aFrom = ymd(new Date(Date.now() - 30 * 864e5));
+    var f = pdate(aFrom, false), t = pdate(aTo, true);
+    var inRange = c.arch.filter(function (r) { return (!f || r.ar >= f) && (!t || r.ar <= t); });
+    var withG = inRange.filter(function (r) { return r.g; });
+    var noG = inRange.length - withG.length;
+    var tot = stat(withG);
+    var qd = function (d) { return ymd(new Date(Date.now() - d * 864e5)); };
+    function q(label, from, id) { return '<span class="sla-b' + (aTo === '' && aFrom === from ? ' on' : '') + '" data-p="' + id + '">' + label + '</span>'; }
+    var h = '<div class="sla-chips">' + q('7 дн.', qd(7), '7') + q('30 дн.', qd(30), '30') + q('90 дн.', qd(90), '90') + q('Усе', '', 'all') + '</div>' +
+      '<div class="sla-dates"><label>З <input type="date" id="arc-f" value="' + esc(aFrom) + '"></label>' +
+      '<label>По <input type="date" id="arc-t" value="' + esc(aTo) + '"></label></div>';
+    if (!c.arch.length) return h + '<div class="empty">Прибуттів ще немає</div>';
+    var oldest = c.arch[c.arch.length - 1].ar;
+    // підсумок
+    var avg = withG.length ? withG.reduce(function (s, r) { return s + r.el; }, 0) / withG.length : 0;
+    h += '<div class="sla-sum"><div class="card"><h3>Підсумок за період</h3>' +
+      '<div class="sla-kv"><span>Прибуттів із групою SLA</span><b>' + tot.n + '</b></div>' +
+      '<div class="sla-kv"><span style="color:' + OK + '">✓ Вчасно</span><b>' + tot.ok + '</b></div>' +
+      '<div class="sla-kv"><span style="color:' + BAD + '">✗ Порушено</span><b>' + tot.bad + '</b></div>' +
+      '<div class="sla-kv"><span>Виконання SLA</span><b>' + (tot.pct === null ? '—' : tot.pct + '%') + '</b></div>' +
+      '<div class="sla-kv"><span>Середній час до прибуття</span><b>' + (tot.n ? fh(avg) : '—') + '</b></div>' +
+      (tot.pct === null ? '' : '<div class="sla-bar"><i style="width:' + tot.pct + '%;background:' + pcol(tot.pct) + '"></i></div>') +
+      (noG ? '<div class="sla-note">Ще ' + noG + ' прибуттів без групи SLA (місто не додано в «Групи») — у підсумок не входять.</div>' : '') + '</div></div>';
+    // по групах
+    h += '<h3 class="sla-h">За групами SLA</h3><div class="sla-sum">';
+    groups().forEach(function (g) {
+      h += statHtml(stat(withG.filter(function (r) { return r.g === g; })), g.name, 'data-g="' + esc(g.id) + '"', gsel === g.id, 'Ліміт ' + fh(g.hours) + ' роб.');
+    });
+    h += '</div>';
+    // по виконавцях
+    var byEx = {};
+    withG.forEach(function (r) { var k = r.e || ''; (byEx[k] = byEx[k] || []).push(r); });
+    var exs = Object.keys(byEx).sort(function (a, b) { return byEx[b].length - byEx[a].length; });
+    h += '<h3 class="sla-h">За виконавцями</h3><div class="sla-sum">';
+    exs.forEach(function (k) { h += statHtml(stat(byEx[k]), k || '— не визначено —', 'data-ex="' + esc(k || '-') + '"', exsel === (k || '-')); });
+    h += '</div>';
+    // список
+    h += '<h3 class="sla-h">Заявки</h3>' + gchips() +
+      '<div class="sla-chips">' +
+      '<span class="sla-b' + (verd === 'all' ? ' on' : '') + '" data-vd="all">Усі</span>' +
+      '<span class="sla-b' + (verd === 'bad' ? ' on' : '') + '" data-vd="bad">✗ Порушені</span>' +
+      '<span class="sla-b' + (verd === 'ok' ? ' on' : '') + '" data-vd="ok">✓ Вчасно</span>' +
+      (exsel ? '<span class="sla-b on" data-ex="">👤 ' + esc(exsel === '-' ? '— не визначено —' : exsel) + ' ✕</span>' : '') + '</div>';
+    var rows = withG.filter(function (r) {
+      return (!gsel || r.g.id === gsel) && (verd === 'all' || (verd === 'bad' ? !r.ok : r.ok)) && (!exsel || (r.e || '-') === exsel);
+    });
+    h += '<div class="sla-note">Знайдено: ' + rows.length + '</div><div class="grid">' + (rows.slice(0, lim).map(function (r) {
+      return '<div class="tk"><div class="stripe" style="background:' + (r.ok ? OK : BAD) + '"></div><div class="body">' +
+        '<div class="n">№ ' + esc(r.a.n) + ' · ' + esc(r.a.ci) + '</div>' +
+        '<div class="st" style="color:' + (r.ok ? OK : BAD) + '">' + (r.ok ? 'Вчасно' : 'Порушено на ' + fh(r.over)) + ' · ' + fh(r.el) + ' з ' + fh(r.g.hours) + '</div>' +
+        '<div>👤 ' + esc(r.e || '— не визначено —') + '</div>' +
+        '<div class="c">' + esc(r.g.name) + ' · створено ' + esc(r.a.cr) + ' · прибув ' + esc(r.a.ar) + '</div></div></div>';
+    }).join('') || '<div class="empty">За цей період і фільтри заявок немає</div>') + '</div>';
+    if (rows.length > lim) h += '<div class="sla-chips"><span class="sla-b on" data-more="1">Показати ще (' + (rows.length - lim) + ')</span></div>';
+    h += '<div class="sla-note">Дані доступні з ' + esc(ymd(oldest)) + '. Час прибуття фіксує монітор, тому точність — до кількох хвилин. Виконавець — той, хто був призначений на момент прибуття.</div>';
     return h;
   }
   function viewGroups(c) {
@@ -367,11 +456,23 @@
 
   function init(o) {
     opts = o || {}; root = opts.root;
+    root.addEventListener('change', function (e) {
+      var i = e.target;
+      if (i && i.id === 'arc-f') { aFrom = i.value || ''; lim = 100; render(); }
+      else if (i && i.id === 'arc-t') { aTo = i.value || ''; lim = 100; render(); }
+    });
     root.addEventListener('click', function (e) {
-      var t = e.target.closest('[data-v],[data-g],[data-edit],[data-add],[data-city]');
+      var t = e.target.closest('[data-v],[data-g],[data-edit],[data-add],[data-city],[data-p],[data-vd],[data-ex],[data-more]');
       if (!t) return;
-      if (t.dataset.v) { view = t.dataset.v; render(); }
-      else if (t.dataset.g !== undefined && t.hasAttribute('data-g')) { gsel = t.dataset.g; render(); }
+      if (t.dataset.v) { view = t.dataset.v; lim = 100; render(); }
+      else if (t.hasAttribute('data-p')) {
+        var d = t.dataset.p;
+        aTo = ''; aFrom = d === 'all' ? '' : ymd(new Date(Date.now() - (+d) * 864e5)); lim = 100; render();
+      }
+      else if (t.hasAttribute('data-vd')) { verd = t.dataset.vd; lim = 100; render(); }
+      else if (t.hasAttribute('data-ex')) { var v = t.dataset.ex; exsel = (exsel === v) ? '' : v; lim = 100; render(); }
+      else if (t.hasAttribute('data-more')) { lim += 100; render(); }
+      else if (t.dataset.g !== undefined && t.hasAttribute('data-g')) { gsel = (view === 'archive' && t.classList.contains('card') && gsel === t.dataset.g) ? '' : t.dataset.g; lim = 100; render(); }
       else if (t.dataset.edit) guard(function () { editGroup(t.dataset.edit); });
       else if (t.dataset.add) guard(function () { editGroup(null); });
       else if (t.dataset.city) guard(function () { if (groups().length) pickGroupForCity(t.dataset.city); else editGroup(null, t.dataset.city); });
