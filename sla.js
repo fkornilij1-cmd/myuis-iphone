@@ -3,10 +3,10 @@
  *               UisSLA.render(data);   // data = JSON знімка з Apps Script
  * Початок відліку SLA -- час реєстрації заявки (data.tickets[].cr),
  * кінець -- статус "Прибув на локацію" (data.arr[].ar, веде монітор).
- * Час рахується у робочих годинах: пн-пт, 10:00-19:00 (як у моніторі). */
+ * Час рахується у робочих годинах: пн-пт, 10:00-19:00 без обіду 13:00-14:00 (8 год/день, як у моніторі). */
 (function () {
   'use strict';
-  var WS = 10, WE = 18, ARR = 'Прибув на локацію', DONE_DAYS = 30;
+  var WS = 10, WE = 19, LS = 13, LE = 14, DAYH = (WE - WS) - (LE - LS), ARR = 'Прибув на локацію', DONE_DAYS = 30;
   var OK = '#43A047', WARN = '#FB8C00', BAD = '#E53935';
   var root = null, opts = {}, data = null, view = 'open', gsel = '', pw = '';
   var aFrom = null, aTo = '', verd = 'all', exsel = '', lim = 100;
@@ -26,10 +26,12 @@
     while (d <= end) {
       var wd = d.getDay();
       if (wd >= 1 && wd <= 5) {
-        var ds = new Date(d); ds.setHours(WS, 0, 0, 0);
-        var de = new Date(d); de.setHours(WE, 0, 0, 0);
-        var s = Math.max(ds, a), e = Math.min(de, b);
-        if (s < e) t += (e - s) / 36e5;
+        [[WS, LS], [LE, WE]].forEach(function (p) {
+          var ds = new Date(d); ds.setHours(p[0], 0, 0, 0);
+          var de = new Date(d); de.setHours(p[1], 0, 0, 0);
+          var s = Math.max(ds, a), e = Math.min(de, b);
+          if (s < e) t += (e - s) / 36e5;
+        });
       }
       d.setDate(d.getDate() + 1);
     }
@@ -38,8 +40,8 @@
   function fh(h) {
     var a = Math.abs(h);
     if (a < 1) return Math.round(a * 60) + ' хв';
-    var d = Math.floor(a / (WE - WS));
-    var r = a - d * (WE - WS);
+    var d = Math.floor(a / DAYH);
+    var r = a - d * DAYH;
     return (d ? d + ' дн. ' : '') + (Math.round(r * 10) / 10) + ' год';
   }
   function groups() { return (data && data.sla && data.sla.groups) || []; }
@@ -204,7 +206,7 @@
         '<div class="sla-bar"><i style="width:' + pct + '%;background:' + COL[lv] + '"></i></div></div></div>';
     }).join('') || '<div class="empty">Немає відкритих заявок у цій групі</div>') + '</div>';
     if (c.nog) h += '<div class="sla-note">Без групи SLA: ' + c.nog + ' відкритих заявок (міста без групи — у вкладці «Групи»).</div>';
-    h += '<div class="sla-note">Відлік — від реєстрації заявки, у робочих годинах (пн–пт, ' + WS + ':00–' + WE + ':00). Завершення — статус «Прибув на локацію».</div>';
+    h += '<div class="sla-note">Відлік — від реєстрації заявки, у робочих годинах (пн–пт, ' + WS + ':00–' + WE + ':00, без обіду ' + LS + ':00–' + LE + ':00; 1 роб. день = ' + DAYH + ' год). Завершення — статус «Прибув на локацію» або «Завершена».</div>';
     return h;
   }
   function viewDone(c) {
