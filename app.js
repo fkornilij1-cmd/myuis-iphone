@@ -38,7 +38,6 @@
     const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = dark ? '#1A1A1A' : '#FFFFFF';
   }
   $('#b-theme').addEventListener('click', () => { dark = !dark; ls.set('dark', dark ? '1' : '0'); applyDark(); });
-  $('#b-site').addEventListener('click', () => window.open(HOME, '_blank'));
 
   // ---------------------------------------------------------------- модальне вікно
   function modal(html, onMount) {
