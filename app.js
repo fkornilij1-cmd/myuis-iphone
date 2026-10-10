@@ -163,11 +163,16 @@
         '<div class="body"><div class="n">№ ' + esc(t.n) + ' · ' + esc(t.o) + '</div>' +
         '<div class="st" style="color:' + color(t.s) + '">' + esc(t.s) + (t.od ? ' ⏰' : '') + '</div>' +
         '<div>👤 ' + (t.e ? esc(t.e) : '— без виконавця —') + '</div>' +
-        (t.ix ? '<div>🏤 Відділення ' + esc(t.ix) + '</div>' : '') +
+        (t.ix ? '<div>🏤 Відділення ' + esc(t.ix) + '</div>' +
+          '<a class="map" href="' + mapUrl(t.ix) + '" target="_blank" rel="noopener">📍 На карті</a>' : '') +
         (t.c ? '<div class="c">' + esc(t.c) + '</div>' : '') +
         '<div class="c">змінено: ' + esc(t.l) + (ts > 0 ? ' (' + ago(ts) + ')' : '') + '</div></div>' +
         '<div class="star" data-star="' + esc(norm(t.n)) + '">' + (on ? '★' : '☆') + '</div></div>';
     }).join('') || '<div class="empty">Нічого не знайдено</div>';
+  }
+  // Google Карти з пошуком «відділення <індекс>» (на iPhone відкриється додаток Google Карти, якщо він є)
+  function mapUrl(ix) {
+    return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent('відділення ' + String(ix).trim());
   }
   function openOnSite(num) {
     try { navigator.clipboard.writeText(num); } catch (e) {}
@@ -180,6 +185,7 @@
     modal('<h2>Заявка № ' + esc(t.n) + '</h2>' + kv('Статус', t.s) + kv('Область', t.o) + kv('Відділення', t.ix) + kv('Виконавець', t.e) +
       kv('Проєкт', t.p === 'main' ? 'Основний (УП)' : 'Пілотний') + kv('Створено', t.cr) + kv('Остання зміна', t.l) +
       (t.c ? '<p style="overflow-wrap:anywhere">' + esc(t.c) + '</p>' : '') +
+      (t.ix ? '<a class="map" style="margin-top:10px" href="' + mapUrl(t.ix) + '" target="_blank" rel="noopener">📍 Показати на карті</a>' : '') +
       '<div class="row"><button id="m-copy">Копіювати №</button><button id="m-close">Закрити</button>' +
       '<button id="m-site" style="background:var(--red);color:#fff;border-color:var(--red)">Відкрити сайт</button></div>',
       (box) => {
@@ -189,6 +195,7 @@
       });
   }
   $('#list').addEventListener('click', (e) => {
+    if (e.target.closest('.map')) return; // посилання на карту відкривається само
     const s = e.target.closest('.star');
     if (s) { const n = s.dataset.star; if (stars.has(n)) stars.delete(n); else stars.add(n); ls.set('stars', JSON.stringify([...stars])); renderTickets(); e.stopPropagation(); return; }
     const c = e.target.closest('.tk');
