@@ -49,4 +49,3 @@ select.chip{font-size:14px;-webkit-appearance:none;appearance:none}
 .box input[type=text]{width:100%;padding:11px 12px;border-radius:10px;border:1px solid var(--bd);background:var(--in);color:var(--tx);font-size:16px}
 .empty{color:var(--sub);padding:30px 10px;text-align:center}
 @media(min-width:700px){.grid{grid-template-columns:repeat(auto-fill,minmax(340px,1fr))}}
-.map{display:inline-block;margin-top:6px;padding:6px 12px;border:1px solid var(--red);border-radius:8px;color:var(--red);font-weight:700;font-size:13px;text-decoration:none}
